@@ -116,7 +116,7 @@ function paintBunny(el, level = 0) {
 const state = {
   scope: "weeks",           // "weeks" | "all"
   selectedWeekIds: new Set(),
-  modes: { listen: true, read: true, trace: true },
+  modes: { listen: true, read: true, trace: true, speak: true },
   queue: [],                // pending questions
   answered: 0,              // questions answered correctly
   totalInitial: 0,
@@ -319,6 +319,7 @@ function nextQuestion() {
 
   if (q.mode === "listen")      renderListen(q);
   else if (q.mode === "read")   renderRead(q);
+  else if (q.mode === "speak")  renderSpeak(q);
   else                           renderTrace(q);
 }
 
@@ -511,6 +512,145 @@ function renderTrace(q) {
   });
 
   startChar(chars[0]);
+}
+
+// --- Speak: use mic -> verify pronunciation ---
+function renderSpeak(q) {
+  const area = $("#question-area");
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const supported = !!SR;
+  const isLong = q.word.hanzi.length > 2;
+
+  area.innerHTML = `
+    <div class="q-prompt">
+      <div class="q-instruction">Say it out loud</div>
+      <div class="q-hanzi ${isLong ? "small" : ""}" id="speak-hanzi">${q.word.hanzi}</div>
+      <div class="q-pinyin">${q.word.pinyin} · ${q.word.english}</div>
+      ${supported ? `
+        <button class="mic-btn" id="mic-btn">
+          <span class="mic-icon">🎤</span>
+          <span class="mic-label" id="mic-label">Tap &amp; Speak</span>
+        </button>
+        <div class="mic-heard" id="mic-heard">Tap the mic, then say the word</div>
+      ` : `
+        <div class="mic-unsupported">
+          This browser can't listen. Try Chrome or Safari on another device.
+        </div>
+      `}
+    </div>
+    <div class="speak-actions">
+      <button class="btn-clear" id="speak-hint">Hear it 🔊</button>
+      <button class="btn-done" id="speak-skip">Skip ›</button>
+    </div>
+  `;
+
+  $("#speak-hanzi").addEventListener("click", () => speak(q.word.hanzi));
+  $("#speak-hint").addEventListener("click", () => speak(q.word.hanzi));
+  $("#speak-skip").addEventListener("click", () => handleAnswer(false, null, q));
+
+  // auto-play the target so the kid hears what they're about to say
+  setTimeout(() => speak(q.word.hanzi), 300);
+
+  if (!supported) return;
+
+  const micBtn = $("#mic-btn");
+  const micLabel = $("#mic-label");
+  const heard = $("#mic-heard");
+  let recognition = null;
+  let recognizing = false;
+  let attempts = 0;
+
+  const stopRecognition = () => {
+    try { recognition?.abort?.(); } catch {}
+    recognizing = false;
+    micBtn.classList.remove("listening");
+  };
+
+  const startRecognition = () => {
+    if (recognizing) { stopRecognition(); return; }
+    // cancel TTS so the mic doesn't pick up the speaker
+    try { window.speechSynthesis?.cancel(); } catch {}
+    recognition = new SR();
+    recognition.lang = "zh-TW";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 5;
+
+    recognition.onstart = () => {
+      recognizing = true;
+      micBtn.classList.add("listening");
+      micLabel.textContent = "Listening…";
+      heard.textContent = "";
+    };
+    recognition.onerror = (e) => {
+      recognizing = false;
+      micBtn.classList.remove("listening");
+      micLabel.textContent = "Try again";
+      if (e.error === "not-allowed" || e.error === "service-not-allowed") {
+        heard.textContent = "Microphone is blocked — allow mic access and try again";
+      } else if (e.error === "no-speech") {
+        heard.textContent = "I didn't hear anything — tap and try again";
+      } else if (e.error === "language-not-supported") {
+        heard.textContent = "This device can't listen in Mandarin";
+      } else {
+        heard.textContent = "Couldn't listen — tap and try again";
+      }
+    };
+    recognition.onend = () => {
+      recognizing = false;
+      micBtn.classList.remove("listening");
+    };
+    recognition.onresult = (ev) => {
+      attempts++;
+      const alts = [];
+      const first = ev.results[0];
+      for (let i = 0; i < first.length; i++) alts.push(first[i].transcript);
+      const matched = alts.find(t => transcriptMatches(t, q.word));
+      if (matched) {
+        heard.innerHTML = `Heard: <b>${escapeHtml(matched.trim())}</b> ✨`;
+        micLabel.textContent = "Great!";
+        micBtn.disabled = true;
+        handleAnswer(true, null, q);
+      } else {
+        const best = (alts[0] || "").trim();
+        heard.innerHTML = best
+          ? `Heard: <b>${escapeHtml(best)}</b> — try again`
+          : "Hmm, I didn't catch that — try again";
+        micLabel.textContent = attempts >= 3 ? "One more try" : "Try again";
+      }
+    };
+
+    try {
+      recognition.start();
+    } catch (err) {
+      heard.textContent = "Couldn't start the mic — try again";
+    }
+  };
+
+  micBtn.addEventListener("click", startRecognition);
+}
+
+// Pinyin tone stripping + character cleanup used by the speak-mode matcher.
+function stripToneMarks(s) {
+  // strip combining diacritical marks (U+0300 – U+036F)
+  return s.normalize("NFD").replace(/[̀-ͯ]/g, "");
+}
+function cleanForMatch(s) {
+  // drop whitespace, punctuation, and common CJK interpuncts
+  return s.replace(/[\s，。！？、,.!?·・／\/]/g, "").toLowerCase();
+}
+function transcriptMatches(transcript, word) {
+  if (!transcript) return false;
+  const t = cleanForMatch(transcript);
+  const h = cleanForMatch(word.hanzi);
+  if (t && h && (t === h || t.includes(h) || h.includes(t))) return true;
+  // pinyin fallback — recognizers occasionally return romanization
+  const tPinyin = cleanForMatch(stripToneMarks(transcript));
+  const wPinyin = cleanForMatch(stripToneMarks(word.pinyin));
+  if (tPinyin && wPinyin && (tPinyin === wPinyin || tPinyin.includes(wPinyin))) return true;
+  return false;
+}
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
 }
 
 // ---------- Answer handling ----------
