@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Malone Mandarin" />
+  <meta name="theme-color" content="#ffd3e0" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icon-192.png" />
+  <link rel="stylesheet" href="./style.css" />
+  <title>Malone Mandarin</title>
+</head>
+<body>
+  <main id="app">
+
+    <!-- ============ HOME ============ -->
+    <section id="screen-home" class="screen active">
+      <header class="home-header">
+        <div id="bunny-home" class="bunny-wrap" aria-hidden="true"></div>
+        <h1>Malone Mandarin</h1>
+        <p class="sub">Pick what to practice!</p>
+      </header>
+
+      <div class="panel">
+        <div class="panel-title">Which words?</div>
+        <div class="pill-row">
+          <button class="pill" data-scope="all">All Words</button>
+          <button class="pill pill-primary active" data-scope="weeks">Pick Weeks</button>
+        </div>
+        <div id="weeks-list" class="weeks-list"></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">How to practice?</div>
+        <div class="mode-grid">
+          <label class="mode-card">
+            <input type="checkbox" id="mode-listen" checked />
+            <div class="mode-emoji">🔊</div>
+            <div class="mode-name">Listen</div>
+            <div class="mode-hint">Hear it · pick the character</div>
+          </label>
+          <label class="mode-card">
+            <input type="checkbox" id="mode-read" checked />
+            <div class="mode-emoji">👀</div>
+            <div class="mode-name">Read</div>
+            <div class="mode-hint">See it · pick the meaning</div>
+          </label>
+          <label class="mode-card">
+            <input type="checkbox" id="mode-trace" checked />
+            <div class="mode-emoji">✍️</div>
+            <div class="mode-name">Trace</div>
+            <div class="mode-hint">Draw the character</div>
+          </label>
+        </div>
+      </div>
+
+      <button id="start-btn" class="big-btn">Start! ✨</button>
+    </section>
+
+    <!-- ============ QUIZ ============ -->
+    <section id="screen-quiz" class="screen">
+      <div class="quiz-top">
+        <button id="quiz-back" class="icon-btn" aria-label="Home">🏠</button>
+        <div class="progress-wrap">
+          <div class="progress-bar"><div id="progress-fill" class="progress-fill"></div></div>
+          <div class="progress-text">
+            <span id="progress-answered">0</span> done ·
+            <span id="progress-left">0</span> to go
+          </div>
+        </div>
+      </div>
+
+      <div id="bunny-quiz" class="bunny-wrap bunny-lg" aria-hidden="true"></div>
+
+      <div id="question-area" class="question-area"></div>
+
+      <div id="feedback" class="feedback" aria-live="polite"></div>
+    </section>
+
+    <!-- ============ END ============ -->
+    <section id="screen-end" class="screen">
+      <div id="bunny-end" class="bunny-wrap bunny-xl" aria-hidden="true"></div>
+      <h2 id="end-title">Great work, Malone!</h2>
+      <p id="end-stats" class="sub"></p>
+      <div id="end-missed" class="panel" hidden>
+        <div class="panel-title">Words to practice again</div>
+        <div id="end-missed-list" class="missed-list"></div>
+      </div>
+      <button id="again-btn" class="big-btn">Play Again ✨</button>
+      <button id="home-btn" class="link-btn">Back to home</button>
+    </section>
+
+  </main>
+
+  <script src="./data.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
