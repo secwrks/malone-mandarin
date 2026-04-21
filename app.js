@@ -405,79 +405,112 @@ function renderRead(q) {
   });
 }
 
-// --- Trace: self-graded drawing ---
+// --- Trace: stroke-order quiz using Hanzi Writer ---
 function renderTrace(q) {
   const area = $("#question-area");
-  const multi = q.word.hanzi.length > 1;
+  // Keep only CJK characters — drop separators like "／" for stroke quiz purposes.
+  const chars = Array.from(q.word.hanzi).filter(c => /[\u3400-\u9fff]/.test(c));
+  const multi = chars.length > 1;
+
   area.innerHTML = `
     <div class="trace-wrap">
-      <div class="q-instruction">Trace the character</div>
-      <div class="q-pinyin">${q.word.pinyin} · ${q.word.english}</div>
-      <div class="trace-stage">
-        <div class="trace-target ${multi ? "multi" : ""}">${q.word.hanzi}</div>
-        <canvas id="trace-canvas"></canvas>
+      <div class="q-instruction">Trace — follow the stroke order</div>
+      <div class="q-pinyin">${q.word.hanzi} · ${q.word.pinyin} · ${q.word.english}</div>
+      <div class="hz-progress" id="hz-progress"></div>
+      <div class="trace-stage hanzi-stage">
+        <div id="hz-target"></div>
       </div>
       <div class="trace-controls">
-        <button class="btn-clear" id="trace-clear">Clear</button>
-        <button class="btn-done" id="trace-done">I traced it! ✓</button>
+        <button class="btn-clear" id="trace-demo">Show me ✨</button>
+        <button class="btn-done" id="trace-skip">Skip ›</button>
       </div>
-      <div class="trace-hint">Tap the character to hear it again</div>
+      <div class="trace-hint" id="hz-hint">Tap the pinyin to hear it again</div>
     </div>
   `;
-  $(".trace-target").addEventListener("click", () => speak(q.word.hanzi));
-  setupCanvas();
+
+  $(".q-pinyin").addEventListener("click", () => speak(q.word.hanzi));
   speak(q.word.hanzi);
-  $("#trace-clear").addEventListener("click", clearCanvas);
-  $("#trace-done").addEventListener("click", () => handleAnswer(true, null, q));
-}
 
-// ---------- Canvas drawing ----------
-let drawCtx = null;
-let drawing = false;
-let lastPt = null;
-function setupCanvas() {
-  const canvas = $("#trace-canvas");
-  const stage = canvas.parentElement;
-  const size = stage.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
-  canvas.width = size.width * dpr;
-  canvas.height = size.height * dpr;
-  drawCtx = canvas.getContext("2d");
-  drawCtx.scale(dpr, dpr);
-  drawCtx.strokeStyle = "#c85ce0";
-  drawCtx.lineWidth = 8;
-  drawCtx.lineCap = "round";
-  drawCtx.lineJoin = "round";
+  if (typeof HanziWriter === "undefined") {
+    $("#hz-hint").textContent = "Loading writer…";
+    setTimeout(() => renderTrace(q), 400);
+    return;
+  }
 
-  const getPt = (ev) => {
-    const rect = canvas.getBoundingClientRect();
-    const t = ev.touches?.[0] || ev.changedTouches?.[0] || ev;
-    return { x: t.clientX - rect.left, y: t.clientY - rect.top };
+  if (chars.length === 0) {
+    // Nothing drawable — auto-pass (e.g., if a word had only punctuation, which we don't expect)
+    setTimeout(() => handleAnswer(true, null, q), 400);
+    return;
+  }
+
+  const stage = $(".hanzi-stage");
+  const size = Math.min(340, Math.max(240, stage.clientWidth - 12));
+  let idx = 0;
+  let writer = null;
+  let totalMistakes = 0;
+
+  const updateProgress = () => {
+    if (!multi) { $("#hz-progress").textContent = ""; return; }
+    $("#hz-progress").textContent = `Character ${idx + 1} of ${chars.length}`;
   };
-  const start = (ev) => { ev.preventDefault(); drawing = true; lastPt = getPt(ev); };
-  const move = (ev) => {
-    if (!drawing) return;
-    ev.preventDefault();
-    const p = getPt(ev);
-    drawCtx.beginPath();
-    drawCtx.moveTo(lastPt.x, lastPt.y);
-    drawCtx.lineTo(p.x, p.y);
-    drawCtx.stroke();
-    lastPt = p;
-  };
-  const end = () => { drawing = false; lastPt = null; };
 
-  canvas.addEventListener("pointerdown", start);
-  canvas.addEventListener("pointermove", move);
-  canvas.addEventListener("pointerup", end);
-  canvas.addEventListener("pointercancel", end);
-  canvas.addEventListener("pointerleave", end);
-}
-function clearCanvas() {
-  const canvas = $("#trace-canvas");
-  if (!canvas || !drawCtx) return;
-  const dpr = window.devicePixelRatio || 1;
-  drawCtx.clearRect(0, 0, canvas.width / dpr, canvas.height / dpr);
+  const advance = () => {
+    idx++;
+    if (idx >= chars.length) {
+      // Allow up to 2 stroke-mistakes per character before we count it as tricky
+      const correct = totalMistakes <= (chars.length * 2);
+      $("#hz-hint").textContent = correct ? "Great stroke order! ✨" : "Let's try that one again later";
+      setTimeout(() => handleAnswer(correct, null, q), 600);
+    } else {
+      setTimeout(() => startChar(chars[idx]), 400);
+    }
+  };
+
+  const buildWriter = (char) => HanziWriter.create("hz-target", char, {
+    width: size,
+    height: size,
+    padding: 8,
+    strokeColor: "#c85ce0",
+    radicalColor: "#8a6aff",
+    outlineColor: "#f0d8f5",
+    drawingColor: "#c85ce0",
+    strokeAnimationSpeed: 1.1,
+    delayBetweenStrokes: 180,
+    showOutline: true,
+    showHintAfterMisses: 2,
+    highlightOnComplete: true,
+    onLoadCharDataError: () => {
+      $("#hz-hint").textContent = `No stroke data for ${char} — skipping`;
+      setTimeout(advance, 800);
+    },
+  });
+
+  const startQuiz = () => {
+    writer.quiz({
+      onMistake: () => { totalMistakes++; },
+      onComplete: advance,
+    });
+  };
+
+  const startChar = (char) => {
+    updateProgress();
+    $("#hz-target").innerHTML = "";
+    writer = buildWriter(char);
+    startQuiz();
+  };
+
+  $("#trace-demo").addEventListener("click", () => {
+    if (!writer) return;
+    try { writer.cancelQuiz(); } catch {}
+    writer.animateCharacter({ onComplete: () => setTimeout(startQuiz, 200) });
+  });
+
+  $("#trace-skip").addEventListener("click", () => {
+    try { writer?.cancelQuiz(); } catch {}
+    handleAnswer(false, null, q);
+  });
+
+  startChar(chars[0]);
 }
 
 // ---------- Answer handling ----------

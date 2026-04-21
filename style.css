@@ -345,39 +345,39 @@ main {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  max-width: 420px;
+  max-width: 360px;
   margin: 8px auto;
   border-radius: 18px;
   background:
     linear-gradient(#ffd3e0 0 0) center/100% 2px no-repeat,
     linear-gradient(#ffd3e0 0 0) center/2px 100% no-repeat,
-    repeating-linear-gradient(45deg, transparent 0 10px, rgba(255,211,224,0.35) 10px 11px),
     #fffdfb;
   border: 2px dashed var(--pink);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
+  touch-action: none;
 }
-.trace-target {
-  position: absolute;
-  inset: 0;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 62vw;
-  font-family: "PingFang TC", "STKaiti", "Heiti TC", serif;
-  color: rgba(42, 37, 64, 0.18);
-  pointer-events: none;
-  user-select: none;
-  line-height: 1;
-}
-@media (min-width: 500px) { .trace-target { font-size: 320px; } }
-.trace-target.multi { font-size: 28vw; }
-@media (min-width: 500px) { .trace-target.multi { font-size: 140px; } }
-
-#trace-canvas {
-  position: absolute;
-  inset: 0;
+#hz-target {
   width: 100%;
   height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#hz-target svg {
+  max-width: 100%;
+  max-height: 100%;
   touch-action: none;
-  cursor: crosshair;
+}
+.hz-progress {
+  text-align: center;
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 700;
+  margin-top: 4px;
+  min-height: 16px;
 }
 
 .trace-controls {
