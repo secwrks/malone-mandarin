@@ -585,24 +585,23 @@ function renderSpeak(q) {
     try { window.speechSynthesis?.cancel(); } catch {}
     recognition = new SR();
     recognition.lang = "zh-TW";
-    recognition.interimResults = false;
+    recognition.interimResults = true;
     recognition.maxAlternatives = 5;
     recognition.continuous = false;
 
+    let gotFinal = false;
+
     recognition.onstart = () => {
       recognizing = true;
+      gotFinal = false;
       micBtn.classList.add("listening");
       micLabel.textContent = "Tap to stop";
-      heard.textContent = "";
+      heard.textContent = "Listening…";
       clearListenTimer();
       listenTimer = setTimeout(() => {
         // Force-process whatever was heard. If nothing, onend fires with no result.
         try { recognition?.stop?.(); } catch {}
       }, MAX_LISTEN_MS);
-    };
-    // Auto-stop as soon as the speaker finishes — speeds up the result.
-    recognition.onspeechend = () => {
-      try { recognition?.stop?.(); } catch {}
     };
     recognition.onerror = (e) => {
       clearListenTimer();
@@ -618,37 +617,55 @@ function renderSpeak(q) {
       } else if (e.error === "aborted") {
         // user tapped stop — keep it quiet
       } else {
-        heard.textContent = "Couldn't listen — tap and try again";
+        heard.textContent = `Mic error (${e.error || "unknown"}) — tap and try again`;
       }
     };
     recognition.onend = () => {
       clearListenTimer();
       recognizing = false;
       micBtn.classList.remove("listening");
-      // If we ended without ever producing a result (timeout/silence), coach the user.
-      if (!micBtn.disabled && micLabel.textContent === "Tap to stop") {
+      if (!micBtn.disabled && !gotFinal) {
         micLabel.textContent = "Tap & Speak";
-        if (!heard.textContent) heard.textContent = "Didn't catch that — tap and try again";
+        if (!heard.textContent || heard.textContent === "Listening…") {
+          heard.textContent = "Didn't catch that — tap and try again";
+        }
       }
     };
+    recognition.onnomatch = () => {
+      heard.textContent = "I heard something but couldn't understand it — try again";
+    };
     recognition.onresult = (ev) => {
-      attempts++;
       clearListenTimer();
-      const alts = [];
-      const first = ev.results[0];
-      for (let i = 0; i < first.length; i++) alts.push(first[i].transcript);
-      const matched = alts.find(t => transcriptMatches(t, q.word));
-      if (matched) {
-        heard.innerHTML = `Heard: <b>${escapeHtml(matched.trim())}</b> ✨`;
-        micLabel.textContent = "Great!";
-        micBtn.disabled = true;
-        handleAnswer(true, null, q);
-      } else {
-        const best = (alts[0] || "").trim();
-        heard.innerHTML = best
-          ? `Heard: <b>${escapeHtml(best)}</b> — try again`
-          : "Hmm, I didn't catch that — try again";
-        micLabel.textContent = attempts >= 3 ? "One more try" : "Try again";
+      // ev.results is a live list: interim entries update in place,
+      // and a final entry appears once the recognizer is confident.
+      let finalResult = null;
+      let interimText = "";
+      for (let i = 0; i < ev.results.length; i++) {
+        const r = ev.results[i];
+        if (r.isFinal) finalResult = r;
+        else interimText += r[0].transcript;
+      }
+
+      if (finalResult) {
+        gotFinal = true;
+        attempts++;
+        const alts = [];
+        for (let j = 0; j < finalResult.length; j++) alts.push(finalResult[j].transcript);
+        const matched = alts.find(t => transcriptMatches(t, q.word));
+        if (matched) {
+          heard.innerHTML = `Heard: <b>${escapeHtml(matched.trim())}</b> ✨`;
+          micLabel.textContent = "Great!";
+          micBtn.disabled = true;
+          handleAnswer(true, null, q);
+        } else {
+          const best = (alts[0] || "").trim();
+          heard.innerHTML = best
+            ? `Heard: <b>${escapeHtml(best)}</b> — try again`
+            : "Hmm, I didn't catch that — try again";
+          micLabel.textContent = attempts >= 3 ? "One more try" : "Try again";
+        }
+      } else if (interimText) {
+        heard.innerHTML = `Hearing: <i>${escapeHtml(interimText.trim())}</i>`;
       }
     };
 
