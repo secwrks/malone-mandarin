@@ -223,7 +223,7 @@ function renderWeeks() {
 
 function updateStartEnabled() {
   const hasWords = state.scope === "all" || state.selectedWeekIds.size > 0;
-  const hasModes = state.modes.listen || state.modes.read || state.modes.trace;
+  const hasModes = Object.values(state.modes).some(Boolean);
   $("#start-btn").disabled = !(hasWords && hasModes);
 }
 
