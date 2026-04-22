@@ -559,29 +559,53 @@ function renderSpeak(q) {
   let recognition = null;
   let recognizing = false;
   let attempts = 0;
+  let listenTimer = null;
+  // Some browsers (iOS Safari especially) won't fire speechend reliably, so we
+  // cap listening ourselves.
+  const MAX_LISTEN_MS = 5000;
 
-  const stopRecognition = () => {
-    try { recognition?.abort?.(); } catch {}
+  const clearListenTimer = () => {
+    if (listenTimer) { clearTimeout(listenTimer); listenTimer = null; }
+  };
+
+  const stopRecognition = (mode = "stop") => {
+    clearListenTimer();
+    try {
+      if (mode === "abort") recognition?.abort?.();
+      else recognition?.stop?.();
+    } catch {}
     recognizing = false;
     micBtn.classList.remove("listening");
+    micLabel.textContent = "Tap & Speak";
   };
 
   const startRecognition = () => {
-    if (recognizing) { stopRecognition(); return; }
+    if (recognizing) { stopRecognition("stop"); return; }
     // cancel TTS so the mic doesn't pick up the speaker
     try { window.speechSynthesis?.cancel(); } catch {}
     recognition = new SR();
     recognition.lang = "zh-TW";
     recognition.interimResults = false;
     recognition.maxAlternatives = 5;
+    recognition.continuous = false;
 
     recognition.onstart = () => {
       recognizing = true;
       micBtn.classList.add("listening");
-      micLabel.textContent = "Listening…";
+      micLabel.textContent = "Tap to stop";
       heard.textContent = "";
+      clearListenTimer();
+      listenTimer = setTimeout(() => {
+        // Force-process whatever was heard. If nothing, onend fires with no result.
+        try { recognition?.stop?.(); } catch {}
+      }, MAX_LISTEN_MS);
+    };
+    // Auto-stop as soon as the speaker finishes — speeds up the result.
+    recognition.onspeechend = () => {
+      try { recognition?.stop?.(); } catch {}
     };
     recognition.onerror = (e) => {
+      clearListenTimer();
       recognizing = false;
       micBtn.classList.remove("listening");
       micLabel.textContent = "Try again";
@@ -591,16 +615,25 @@ function renderSpeak(q) {
         heard.textContent = "I didn't hear anything — tap and try again";
       } else if (e.error === "language-not-supported") {
         heard.textContent = "This device can't listen in Mandarin";
+      } else if (e.error === "aborted") {
+        // user tapped stop — keep it quiet
       } else {
         heard.textContent = "Couldn't listen — tap and try again";
       }
     };
     recognition.onend = () => {
+      clearListenTimer();
       recognizing = false;
       micBtn.classList.remove("listening");
+      // If we ended without ever producing a result (timeout/silence), coach the user.
+      if (!micBtn.disabled && micLabel.textContent === "Tap to stop") {
+        micLabel.textContent = "Tap & Speak";
+        if (!heard.textContent) heard.textContent = "Didn't catch that — tap and try again";
+      }
     };
     recognition.onresult = (ev) => {
       attempts++;
+      clearListenTimer();
       const alts = [];
       const first = ev.results[0];
       for (let i = 0; i < first.length; i++) alts.push(first[i].transcript);
