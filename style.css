@@ -404,6 +404,42 @@ main {
   color: var(--ink-soft);
 }
 
+/* ---- Read-answer type toggle (home) ---- */
+.read-opt-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #f0e4f3;
+}
+.read-opt-label {
+  font-size: 13px;
+  color: var(--ink-soft);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.pill.mini {
+  font-size: 14px;
+  padding: 8px 14px;
+}
+
+/* ---- Skip-for-now (per-question) ---- */
+.skip-row {
+  text-align: center;
+  margin-top: 14px;
+}
+.skip-btn {
+  background: none;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 8px 14px;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.skip-btn:active { opacity: 0.6; }
+
 /* ---- Speak (mic) ---- */
 .mic-btn {
   display: inline-flex;

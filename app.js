@@ -117,6 +117,7 @@ const state = {
   scope: "weeks",           // "weeks" | "all"
   selectedWeekIds: new Set(),
   modes: { listen: true, read: true, trace: true, speak: true },
+  readAnswerType: "english", // "english" | "pinyin" — choice text in Read mode
   queue: [],                // pending questions
   answered: 0,              // questions answered correctly
   totalInitial: 0,
@@ -230,13 +231,21 @@ function updateStartEnabled() {
 function bindHome() {
   paintBunny($("#bunny-home"), 0);
 
-  $$(".pill").forEach(p => {
+  $$(".pill[data-scope]").forEach(p => {
     p.addEventListener("click", () => {
-      $$(".pill").forEach(x => x.classList.remove("active"));
+      $$(".pill[data-scope]").forEach(x => x.classList.remove("active"));
       p.classList.add("active");
       state.scope = p.dataset.scope;
       $("#weeks-list").hidden = state.scope !== "weeks";
       updateStartEnabled();
+    });
+  });
+
+  $$(".pill[data-read]").forEach(p => {
+    p.addEventListener("click", () => {
+      $$(".pill[data-read]").forEach(x => x.classList.remove("active", "pill-primary"));
+      p.classList.add("active", "pill-primary");
+      state.readAnswerType = p.dataset.read;
     });
   });
 
@@ -362,6 +371,7 @@ function renderListen(q) {
       <div class="q-pinyin" id="show-pinyin" style="margin-top:12px;opacity:0;transition:opacity .3s;">${q.word.pinyin}</div>
     </div>
     <div class="choices" id="choices"></div>
+    ${skipRowHtml()}
   `;
   const choicesEl = $("#choices");
   options.forEach(opt => {
@@ -379,31 +389,40 @@ function renderListen(q) {
   $("#speak-btn").addEventListener("click", doSpeak);
   // auto-play on entry (may require prior user gesture on iOS — first tap satisfies it)
   setTimeout(doSpeak, 350);
+  bindSkipRow(q);
 }
 
-// --- Read: see character -> pick English ---
+// --- Read: see character -> pick English or Pinyin (per home-screen toggle) ---
 function renderRead(q) {
   const words = getSelectedWords();
   const options = shuffle([q.word, ...distractors(q.word, words, 3)]);
   const isLong = q.word.hanzi.length > 2;
+  const answerKey = state.readAnswerType === "pinyin" ? "pinyin" : "english";
+  const instruction = answerKey === "pinyin" ? "How do you say this?" : "What does this mean?";
+  // Don't reveal pinyin in the prompt when pinyin is the answer.
+  const pinyinHint = answerKey === "pinyin"
+    ? ""
+    : `<div class="q-pinyin">${q.word.pinyin}</div>`;
   const area = $("#question-area");
   area.innerHTML = `
     <div class="q-prompt">
-      <div class="q-instruction">What does this mean?</div>
+      <div class="q-instruction">${instruction}</div>
       <div class="q-hanzi ${isLong ? "small" : ""}" id="read-hanzi">${q.word.hanzi}</div>
-      <div class="q-pinyin">${q.word.pinyin}</div>
+      ${pinyinHint}
     </div>
     <div class="choices" id="choices"></div>
+    ${skipRowHtml()}
   `;
   $("#read-hanzi").addEventListener("click", () => speak(q.word.hanzi));
   const choicesEl = $("#choices");
   options.forEach(opt => {
     const b = document.createElement("button");
     b.className = "choice text-choice";
-    b.textContent = opt.english;
+    b.textContent = opt[answerKey];
     b.addEventListener("click", () => handleAnswer(opt.hanzi === q.word.hanzi, b, q));
     choicesEl.appendChild(b);
   });
+  bindSkipRow(q);
 }
 
 // --- Trace: stroke-order quiz using Hanzi Writer ---
@@ -508,7 +527,7 @@ function renderTrace(q) {
 
   $("#trace-skip").addEventListener("click", () => {
     try { writer?.cancelQuiz(); } catch {}
-    handleAnswer(false, null, q);
+    skipQuestion(q);
   });
 
   startChar(chars[0]);
@@ -546,7 +565,7 @@ function renderSpeak(q) {
 
   $("#speak-hanzi").addEventListener("click", () => speak(q.word.hanzi));
   $("#speak-hint").addEventListener("click", () => speak(q.word.hanzi));
-  $("#speak-skip").addEventListener("click", () => handleAnswer(false, null, q));
+  $("#speak-skip").addEventListener("click", () => skipQuestion(q));
 
   // auto-play the target so the kid hears what they're about to say
   setTimeout(() => speak(q.word.hanzi), 300);
@@ -701,6 +720,25 @@ function transcriptMatches(transcript, word) {
 }
 function escapeHtml(s) {
   return s.replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;" }[c]));
+}
+
+// ---------- Skip (revisit later, no penalty) ----------
+function skipRowHtml() {
+  return `
+    <div class="skip-row">
+      <button class="skip-btn" data-action="skip">Skip for now ›</button>
+    </div>
+  `;
+}
+function bindSkipRow(q) {
+  const btn = $("#question-area .skip-btn");
+  if (btn) btn.addEventListener("click", () => skipQuestion(q));
+}
+function skipQuestion(q) {
+  try { window.speechSynthesis?.cancel?.(); } catch {}
+  // Push to the back so it comes around again without counting as wrong.
+  state.queue.push({ ...q, repeat: true });
+  nextQuestion();
 }
 
 // ---------- Answer handling ----------
