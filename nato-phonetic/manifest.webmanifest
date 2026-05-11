@@ -1,0 +1,11 @@
+{
+  "name": "NATO Phonetic",
+  "short_name": "NATO",
+  "description": "Fun NATO phonetic alphabet practice — listen, read, spell, and speak Alfa through Zulu.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#f6fbff",
+  "theme_color": "#cfe6ff",
+  "icons": []
+}
