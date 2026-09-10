@@ -125,6 +125,7 @@ const state = {
   missedWords: new Map(),   // hanzi -> word (to show at end)
   currentQ: null,
   magicLevel: 0,
+  session: 0,               // bumped on start/home so stale timers can bail out
 };
 
 // ---------- Helpers ----------
@@ -135,6 +136,21 @@ function showScreen(id) {
   $$(".screen").forEach(s => s.classList.remove("active"));
   $(`#${id}`).classList.add("active");
   window.scrollTo(0, 0);
+}
+
+// setTimeout that is silently dropped if the quiz session changed in the
+// meantime (Home tapped, or a new session started). Every delayed quiz action
+// must go through this so a hidden quiz screen never keeps talking/advancing.
+function later(fn, ms) {
+  const s = state.session;
+  return setTimeout(() => { if (s === state.session) fn(); }, ms);
+}
+function leaveQuiz() {
+  state.session++;
+  state.currentQ = null;
+  try { window.speechSynthesis?.cancel?.(); } catch {}
+  try { activeMicStop?.(); } catch {}
+  activeMicStop = null;
 }
 
 function shuffle(arr) {
@@ -156,7 +172,9 @@ function parseDate(mdY) {
 function isCurrentWeek(range) {
   const [start, end] = range.split("–").map(s => s.trim());
   if (!start || !end) return false;
+  // Compare at day granularity so the last day of the range still counts.
   const today = new Date();
+  today.setHours(0, 0, 0, 0);
   return today >= parseDate(start) && today <= parseDate(end);
 }
 
@@ -294,6 +312,7 @@ function buildQueue() {
 }
 
 function startSession() {
+  state.session++;
   state.queue = buildQueue();
   state.totalInitial = state.queue.length;
   state.answered = 0;
@@ -339,19 +358,25 @@ function distractors(correct, all, n = 3) {
   const correctWeek = WEEKS.find(wk =>
     wk.words.some(w => w.hanzi === correct.hanzi && w.pinyin === correct.pinyin)
   );
-  const sameLen = (w) =>
-    w.hanzi !== correct.hanzi && w.hanzi.length === correct.hanzi.length;
+  // A distractor must differ from the target in every field a mode can show
+  // (e.g. 他/她 share pinyin "tā"), otherwise two choices look identical and
+  // one of them is "wrong".
+  const clashes = (w) =>
+    w.hanzi === correct.hanzi || w.pinyin === correct.pinyin || w.english === correct.english;
+  const sameLen = (w) => !clashes(w) && w.hanzi.length === correct.hanzi.length;
 
   const tiers = [];
   if (correctWeek) tiers.push(correctWeek.words.filter(sameLen));
   tiers.push(all.filter(sameLen));
-  tiers.push(all.filter(w => w.hanzi !== correct.hanzi));
+  tiers.push(all.filter(w => !clashes(w)));
 
-  const seen = new Set();
+  const seenHanzi = new Set(), seenPinyin = new Set(), seenEnglish = new Set();
   const pool = [];
   for (const tier of tiers) {
     for (const w of shuffle(tier)) {
-      if (!seen.has(w.hanzi)) { seen.add(w.hanzi); pool.push(w); }
+      if (seenHanzi.has(w.hanzi) || seenPinyin.has(w.pinyin) || seenEnglish.has(w.english)) continue;
+      seenHanzi.add(w.hanzi); seenPinyin.add(w.pinyin); seenEnglish.add(w.english);
+      pool.push(w);
       if (pool.length >= n) break;
     }
     if (pool.length >= n) break;
@@ -378,6 +403,7 @@ function renderListen(q) {
     const b = document.createElement("button");
     b.className = "choice";
     b.textContent = opt.hanzi;
+    b.dataset.hanzi = opt.hanzi;
     b.addEventListener("click", () => handleAnswer(opt.hanzi === q.word.hanzi, b, q));
     choicesEl.appendChild(b);
   });
@@ -388,7 +414,7 @@ function renderListen(q) {
   };
   $("#speak-btn").addEventListener("click", doSpeak);
   // auto-play on entry (may require prior user gesture on iOS — first tap satisfies it)
-  setTimeout(doSpeak, 350);
+  later(doSpeak, 350);
   bindSkipRow(q);
 }
 
@@ -419,6 +445,7 @@ function renderRead(q) {
     const b = document.createElement("button");
     b.className = "choice text-choice";
     b.textContent = opt[answerKey];
+    b.dataset.hanzi = opt.hanzi;
     b.addEventListener("click", () => handleAnswer(opt.hanzi === q.word.hanzi, b, q));
     choicesEl.appendChild(b);
   });
@@ -426,8 +453,27 @@ function renderRead(q) {
 }
 
 // --- Trace: stroke-order quiz using Hanzi Writer ---
-function renderTrace(q) {
+function renderTrace(q, tries = 0) {
   const area = $("#question-area");
+
+  // Hanzi Writer comes from a CDN. If it hasn't arrived after ~4s (offline,
+  // blocked, slow), don't spin forever — ask this word as a Read question.
+  if (typeof HanziWriter === "undefined") {
+    if (tries >= 10) {
+      q.mode = "read";
+      renderRead(q);
+      return;
+    }
+    area.innerHTML = `
+      <div class="trace-wrap">
+        <div class="q-instruction">Trace — follow the stroke order</div>
+        <div class="q-pinyin">${q.word.hanzi} · ${q.word.pinyin} · ${q.word.english}</div>
+        <div class="trace-hint">Loading writer…</div>
+      </div>
+    `;
+    later(() => renderTrace(q, tries + 1), 400);
+    return;
+  }
   // Keep only CJK characters — drop separators like "／" for stroke quiz purposes.
   const chars = Array.from(q.word.hanzi).filter(c => /[\u3400-\u9fff]/.test(c));
   const multi = chars.length > 1;
@@ -451,15 +497,9 @@ function renderTrace(q) {
   $(".q-pinyin").addEventListener("click", () => speak(q.word.hanzi));
   speak(q.word.hanzi);
 
-  if (typeof HanziWriter === "undefined") {
-    $("#hz-hint").textContent = "Loading writer…";
-    setTimeout(() => renderTrace(q), 400);
-    return;
-  }
-
   if (chars.length === 0) {
     // Nothing drawable — auto-pass (e.g., if a word had only punctuation, which we don't expect)
-    setTimeout(() => handleAnswer(true, null, q), 400);
+    later(() => handleAnswer(true, null, q), 400);
     return;
   }
 
@@ -480,9 +520,9 @@ function renderTrace(q) {
       // Allow up to 2 stroke-mistakes per character before we count it as tricky
       const correct = totalMistakes <= (chars.length * 2);
       $("#hz-hint").textContent = correct ? "Great stroke order! ✨" : "Let's try that one again later";
-      setTimeout(() => handleAnswer(correct, null, q), 600);
+      later(() => handleAnswer(correct, null, q), 600);
     } else {
-      setTimeout(() => startChar(chars[idx]), 400);
+      later(() => { if (state.currentQ === q) startChar(chars[idx]); }, 400);
     }
   };
 
@@ -500,8 +540,9 @@ function renderTrace(q) {
     showHintAfterMisses: 2,
     highlightOnComplete: true,
     onLoadCharDataError: () => {
-      $("#hz-hint").textContent = `No stroke data for ${char} — skipping`;
-      setTimeout(advance, 800);
+      const hint = $("#hz-hint");
+      if (hint) hint.textContent = `No stroke data for ${char} — skipping`;
+      later(advance, 800);
     },
   });
 
@@ -534,7 +575,10 @@ function renderTrace(q) {
 }
 
 // --- Speak: use mic -> verify pronunciation ---
+// Set by renderSpeak so the Home button can abort an in-flight recognition.
+let activeMicStop = null;
 function renderSpeak(q) {
+  activeMicStop = null;
   const area = $("#question-area");
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const supported = !!SR;
@@ -568,7 +612,7 @@ function renderSpeak(q) {
   $("#speak-skip").addEventListener("click", () => skipQuestion(q));
 
   // auto-play the target so the kid hears what they're about to say
-  setTimeout(() => speak(q.word.hanzi), 300);
+  later(() => speak(q.word.hanzi), 300);
 
   if (!supported) return;
 
@@ -597,6 +641,8 @@ function renderSpeak(q) {
     micBtn.classList.remove("listening");
     micLabel.textContent = "Tap & Speak";
   };
+  // Let the Home button kill the mic if the kid leaves mid-question.
+  activeMicStop = () => stopRecognition("abort");
 
   const startRecognition = () => {
     if (recognizing) { stopRecognition("stop"); return; }
@@ -711,7 +757,8 @@ function transcriptMatches(transcript, word) {
   if (!transcript) return false;
   const t = cleanForMatch(transcript);
   const h = cleanForMatch(word.hanzi);
-  if (t && h && (t === h || t.includes(h) || h.includes(t))) return true;
+  // The whole word must be heard — saying just 東 shouldn't pass for 東西.
+  if (t && h && t.includes(h)) return true;
   // pinyin fallback — recognizers occasionally return romanization
   const tPinyin = cleanForMatch(stripToneMarks(transcript));
   const wPinyin = cleanForMatch(stripToneMarks(word.pinyin));
@@ -735,14 +782,25 @@ function bindSkipRow(q) {
   if (btn) btn.addEventListener("click", () => skipQuestion(q));
 }
 function skipQuestion(q) {
+  if (!settleQuestion(q)) return;
   try { window.speechSynthesis?.cancel?.(); } catch {}
   // Push to the back so it comes around again without counting as wrong.
-  state.queue.push({ ...q, repeat: true });
+  state.queue.push({ ...q, repeat: true, done: false });
   nextQuestion();
+}
+
+// A question can be answered or skipped exactly once. Returns false if this
+// question is stale (already settled, or no longer the one on screen), which
+// happens when Skip is tapped during the answer-feedback pause.
+function settleQuestion(q) {
+  if (!q || q.done || q !== state.currentQ) return false;
+  q.done = true;
+  return true;
 }
 
 // ---------- Answer handling ----------
 function handleAnswer(correct, btn, q) {
+  if (!settleQuestion(q)) return;
   const feedback = $("#feedback");
 
   if (correct) {
@@ -756,15 +814,13 @@ function handleAnswer(correct, btn, q) {
     feedback.textContent = pickCheer();
     feedback.className = "feedback ok";
     burstConfetti();
-    setTimeout(nextQuestion, 950);
+    later(nextQuestion, 950);
   } else {
     if (btn) {
       btn.classList.add("wrong");
-      // also highlight the correct one
+      // also highlight the correct one (works for hanzi, English, or pinyin choices)
       $$("#choices .choice").forEach(c => {
-        if (c.textContent === q.word.hanzi || c.textContent === q.word.english) {
-          c.classList.add("correct");
-        }
+        if (c.dataset.hanzi === q.word.hanzi) c.classList.add("correct");
         c.disabled = true;
       });
     }
@@ -774,13 +830,13 @@ function handleAnswer(correct, btn, q) {
     state.missStreakByWord.set(q.word.hanzi, streak);
     // re-queue this word: bounce it a few spots back so it returns later in the session
     const reinsertAt = Math.min(state.queue.length, 3 + Math.floor(Math.random() * 3));
-    state.queue.splice(reinsertAt, 0, { ...q, repeat: true });
+    state.queue.splice(reinsertAt, 0, { ...q, repeat: true, done: false });
 
     feedback.innerHTML = `The answer is <b>${q.word.hanzi}</b> · ${q.word.pinyin} · ${q.word.english}`;
     feedback.className = "feedback bad";
     speak(q.word.hanzi);
     // let Malone see the correct one, then continue
-    setTimeout(nextQuestion, 2200);
+    later(nextQuestion, 2200);
   }
   updateProgress();
 }
@@ -811,7 +867,6 @@ function endSession() {
   paintBunny($("#bunny-end"), state.magicLevel);
   const perfect = state.missedWords.size === 0;
   $("#end-title").textContent = perfect ? "🌟 Perfect! 🌟" : "Great work, Malone!";
-  const answered = state.totalInitial + state.missedWords.size * 0; // answered equals total
   $("#end-stats").textContent =
     `${state.answered} questions answered · ${state.missedWords.size} tricky word${state.missedWords.size === 1 ? "" : "s"}`;
   const missedWrap = $("#end-missed");
@@ -836,7 +891,7 @@ function endSession() {
 // ---------- Nav ----------
 function bindNav() {
   $("#quiz-back").addEventListener("click", () => {
-    try { window.speechSynthesis?.cancel?.(); } catch {}
+    leaveQuiz();
     showScreen("screen-home");
   });
   $("#again-btn").addEventListener("click", startSession);

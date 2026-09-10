@@ -32,7 +32,7 @@ html, body {
 main {
   max-width: 560px;
   margin: 0 auto;
-  padding: 16px 18px calc(16px + env(safe-area-inset-bottom));
+  padding: calc(16px + env(safe-area-inset-top)) 18px calc(16px + env(safe-area-inset-bottom));
   min-height: 100vh;
   min-height: 100dvh;
 }
@@ -195,17 +195,25 @@ main {
   gap: 10px;
   padding: 4px 0 8px;
 }
-.icon-btn {
-  width: 40px; height: 40px;
-  border-radius: 50%;
-  border: none;
+.home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 2px solid var(--pink-deep);
   background: white;
-  font-size: 20px;
-  font-weight: 700;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 800;
   box-shadow: var(--shadow);
   cursor: pointer;
   flex-shrink: 0;
+  -webkit-tap-highlight-color: transparent;
 }
+.home-btn:active { transform: scale(.96); }
 .progress-wrap { flex: 1; }
 .progress-bar {
   height: 10px;
