@@ -177,6 +177,14 @@ main {
 .big-btn:active { transform: scale(0.98); }
 .big-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
+.build {
+  text-align: center;
+  font-size: 11px;
+  color: var(--ink-soft);
+  opacity: .6;
+  margin: 4px 0 0;
+}
+
 .link-btn {
   display: block;
   margin: 8px auto 0;
