@@ -164,6 +164,19 @@ function shuffle(arr) {
 
 function pickN(arr, n) { return shuffle(arr).slice(0, n); }
 
+// Picture for a word (emoji from data.js), as an inline HTML chunk. Empty if none.
+function picHtml(w, cls = "pic") {
+  return w?.emoji ? `<span class="${cls}" aria-hidden="true">${w.emoji}</span>` : "";
+}
+// Build one answer button: picture on top, hanzi/English/pinyin under it.
+function choiceButton(opt, text, extraClass = "") {
+  const b = document.createElement("button");
+  b.className = `choice ${extraClass}`.trim();
+  b.dataset.hanzi = opt.hanzi;
+  b.innerHTML = `${picHtml(opt, "choice-pic")}<span class="choice-text">${text}</span>`;
+  return b;
+}
+
 function parseDate(mdY) {
   // "4/20/26" -> Date
   const [m, d, y] = mdY.split("/").map(Number);
@@ -400,10 +413,7 @@ function renderListen(q) {
   `;
   const choicesEl = $("#choices");
   options.forEach(opt => {
-    const b = document.createElement("button");
-    b.className = "choice";
-    b.textContent = opt.hanzi;
-    b.dataset.hanzi = opt.hanzi;
+    const b = choiceButton(opt, opt.hanzi);
     b.addEventListener("click", () => handleAnswer(opt.hanzi === q.word.hanzi, b, q));
     choicesEl.appendChild(b);
   });
@@ -442,10 +452,7 @@ function renderRead(q) {
   $("#read-hanzi").addEventListener("click", () => speak(q.word.hanzi));
   const choicesEl = $("#choices");
   options.forEach(opt => {
-    const b = document.createElement("button");
-    b.className = "choice text-choice";
-    b.textContent = opt[answerKey];
-    b.dataset.hanzi = opt.hanzi;
+    const b = choiceButton(opt, opt[answerKey], "text-choice");
     b.addEventListener("click", () => handleAnswer(opt.hanzi === q.word.hanzi, b, q));
     choicesEl.appendChild(b);
   });
@@ -467,7 +474,7 @@ function renderTrace(q, tries = 0) {
     area.innerHTML = `
       <div class="trace-wrap">
         <div class="q-instruction">Trace — follow the stroke order</div>
-        <div class="q-pinyin">${q.word.hanzi} · ${q.word.pinyin} · ${q.word.english}</div>
+        <div class="q-pinyin">${picHtml(q.word)} ${q.word.hanzi} · ${q.word.pinyin} · ${q.word.english}</div>
         <div class="trace-hint">Loading writer…</div>
       </div>
     `;
@@ -481,7 +488,7 @@ function renderTrace(q, tries = 0) {
   area.innerHTML = `
     <div class="trace-wrap">
       <div class="q-instruction">Trace — follow the stroke order</div>
-      <div class="q-pinyin">${q.word.hanzi} · ${q.word.pinyin} · ${q.word.english}</div>
+      <div class="q-pinyin">${picHtml(q.word)} ${q.word.hanzi} · ${q.word.pinyin} · ${q.word.english}</div>
       <div class="hz-progress" id="hz-progress"></div>
       <div class="trace-stage hanzi-stage">
         <div id="hz-target"></div>
@@ -588,7 +595,7 @@ function renderSpeak(q) {
     <div class="q-prompt">
       <div class="q-instruction">Say it out loud</div>
       <div class="q-hanzi ${isLong ? "small" : ""}" id="speak-hanzi">${q.word.hanzi}</div>
-      <div class="q-pinyin">${q.word.pinyin} · ${q.word.english}</div>
+      <div class="q-pinyin">${picHtml(q.word)} ${q.word.pinyin} · ${q.word.english}</div>
       ${supported ? `
         <button class="mic-btn" id="mic-btn">
           <span class="mic-icon">🎤</span>
@@ -832,7 +839,7 @@ function handleAnswer(correct, btn, q) {
     const reinsertAt = Math.min(state.queue.length, 3 + Math.floor(Math.random() * 3));
     state.queue.splice(reinsertAt, 0, { ...q, repeat: true, done: false });
 
-    feedback.innerHTML = `The answer is <b>${q.word.hanzi}</b> · ${q.word.pinyin} · ${q.word.english}`;
+    feedback.innerHTML = `The answer is ${picHtml(q.word, "pic pic-lg")} <b>${q.word.hanzi}</b> · ${q.word.pinyin} · ${q.word.english}`;
     feedback.className = "feedback bad";
     speak(q.word.hanzi);
     // let Malone see the correct one, then continue
@@ -877,7 +884,7 @@ function endSession() {
     state.missedWords.forEach(w => {
       const chip = document.createElement("span");
       chip.className = "missed-chip";
-      chip.textContent = w.hanzi;
+      chip.textContent = w.emoji ? `${w.emoji} ${w.hanzi}` : w.hanzi;
       chip.title = `${w.pinyin} · ${w.english}`;
       chip.addEventListener("click", () => speak(w.hanzi));
       missedList.appendChild(chip);
