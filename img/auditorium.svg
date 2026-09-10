@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+<rect x="10" y="10" width="100" height="100" rx="8" fill="#fff3c4" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<rect x="10" y="10" width="100" height="18" rx="6" fill="#ff6b6b" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M14 28 q0 44 20 48 q-10 -20 -8 -48 z" fill="#ff6b6b" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M106 28 q0 44 -20 48 q10 -20 8 -48 z" fill="#ff6b6b" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M22 60 q6 8 12 0" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M86 60 q6 8 12 0" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+<path d="M60 20 l22 58 h-44 z" fill="#ffffff" opacity=".7"/>
+<rect x="18" y="82" width="84" height="20" rx="4" fill="#c9a27a" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+<path d="M60 50 l4 9 l10 1 l-7 7 l2 10 l-9 -5 l-9 5 l2 -10 l-7 -7 l10 -1 z" fill="#ffd93d" stroke="#3a3356" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

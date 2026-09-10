@@ -164,9 +164,9 @@ function shuffle(arr) {
 
 function pickN(arr, n) { return shuffle(arr).slice(0, n); }
 
-// Picture for a word (emoji from data.js), as an inline HTML chunk. Empty if none.
+// Picture for a word (SVG path from data.js), as an inline HTML chunk. Empty if none.
 function picHtml(w, cls = "pic") {
-  return w?.emoji ? `<span class="${cls}" aria-hidden="true">${w.emoji}</span>` : "";
+  return w?.image ? `<img class="${cls}" src="${w.image}" alt="" draggable="false">` : "";
 }
 // Build one answer button: picture on top, hanzi/English/pinyin under it.
 function choiceButton(opt, text, extraClass = "") {
@@ -884,7 +884,7 @@ function endSession() {
     state.missedWords.forEach(w => {
       const chip = document.createElement("span");
       chip.className = "missed-chip";
-      chip.textContent = w.emoji ? `${w.emoji} ${w.hanzi}` : w.hanzi;
+      chip.innerHTML = `${picHtml(w, "pic chip-pic")}${w.hanzi}`;
       chip.title = `${w.pinyin} · ${w.english}`;
       chip.addEventListener("click", () => speak(w.hanzi));
       missedList.appendChild(chip);

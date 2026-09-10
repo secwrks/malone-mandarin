@@ -319,22 +319,27 @@ main {
   gap: 4px;
 }
 .choice-pic {
-  font-size: 40px;
-  line-height: 1;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  width: 72px;
+  height: 72px;
+  display: block;
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
 }
 .choice .choice-text { display: block; }
-.choice:has(.choice-pic) { font-size: 40px; padding: 14px 10px; }
+.choice:has(.choice-pic) { font-size: 40px; padding: 12px 10px 14px; }
 .choice.text-choice:has(.choice-pic) { font-size: 18px; }
 
 /* inline picture in prompts / feedback / chips */
 .pic {
-  font-size: 1.35em;
-  line-height: 1;
-  vertical-align: -0.15em;
-  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif;
+  width: 1.7em;
+  height: 1.7em;
+  vertical-align: middle;
+  margin-right: 2px;
+  pointer-events: none;
 }
-.pic.pic-lg { font-size: 1.7em; }
+.pic.pic-lg { width: 2.2em; height: 2.2em; }
+.pic.chip-pic { width: 1.3em; height: 1.3em; margin-right: 4px; }
 .choice:active { transform: scale(0.97); }
 .choice.correct {
   background: #e5fbee;
