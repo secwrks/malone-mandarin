@@ -534,7 +534,10 @@ function renderTrace(q) {
 }
 
 // --- Speak: use mic -> verify pronunciation ---
+// Set by renderSpeak so the Home button can abort an in-flight recognition.
+let activeMicStop = null;
 function renderSpeak(q) {
+  activeMicStop = null;
   const area = $("#question-area");
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   const supported = !!SR;
@@ -597,6 +600,8 @@ function renderSpeak(q) {
     micBtn.classList.remove("listening");
     micLabel.textContent = "Tap & Speak";
   };
+  // Let the Home button kill the mic if the kid leaves mid-question.
+  activeMicStop = () => stopRecognition("abort");
 
   const startRecognition = () => {
     if (recognizing) { stopRecognition("stop"); return; }
@@ -837,6 +842,8 @@ function endSession() {
 function bindNav() {
   $("#quiz-back").addEventListener("click", () => {
     try { window.speechSynthesis?.cancel?.(); } catch {}
+    try { activeMicStop?.(); } catch {}
+    activeMicStop = null;
     showScreen("screen-home");
   });
   $("#again-btn").addEventListener("click", startSession);
