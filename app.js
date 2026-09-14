@@ -297,6 +297,7 @@ function bindHome() {
   });
 
   $("#start-btn").addEventListener("click", startSession);
+  $("#next-btn").addEventListener("click", nextQuestion);
 }
 
 // ---------- Session setup ----------
@@ -351,6 +352,7 @@ function updateProgress() {
 function nextQuestion() {
   $("#feedback").textContent = "";
   $("#feedback").className = "feedback";
+  $("#next-row").hidden = true;
   updateProgress();
 
   if (state.queue.length === 0) return endSession();
@@ -821,7 +823,7 @@ function handleAnswer(correct, btn, q) {
     feedback.textContent = pickCheer();
     feedback.className = "feedback ok";
     burstConfetti();
-    later(nextQuestion, 950);
+    showNextButton();
   } else {
     if (btn) {
       btn.classList.add("wrong");
@@ -842,10 +844,21 @@ function handleAnswer(correct, btn, q) {
     feedback.innerHTML = `The answer is ${picHtml(q.word, "pic pic-lg")} <b>${q.word.hanzi}</b> · ${q.word.pinyin} · ${q.word.english}`;
     feedback.className = "feedback bad";
     speak(q.word.hanzi);
-    // let Malone see the correct one, then continue
-    later(nextQuestion, 2200);
+    showNextButton();
   }
   updateProgress();
+}
+
+// After an answer, wait for a tap on Next instead of auto-advancing, so the
+// result stays on screen as long as needed. On the last question it ends the
+// session instead.
+function showNextButton() {
+  const skip = $("#question-area .skip-row");
+  if (skip) skip.hidden = true;
+  $("#next-btn").textContent = state.queue.length === 0 ? "Finish ✨" : "Next ›";
+  $("#next-row").hidden = false;
+  // The button sits below the choices, so make sure it's on screen.
+  try { $("#next-row").scrollIntoView({ behavior: "smooth", block: "nearest" }); } catch {}
 }
 
 const CHEERS = ["Yes!", "太棒了!", "Magic!", "Good job!", "Sparkle!", "Woohoo!", "Bunny loves it!", "Nice one!"];

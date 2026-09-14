@@ -382,6 +382,14 @@ main {
 .feedback.ok { color: var(--ok); }
 .feedback.bad { color: var(--bad); }
 
+/* ---- Next button (shown after an answer) ---- */
+.next-row { margin-top: 14px; }
+.next-btn { animation: next-pop 0.25s ease-out; }
+@keyframes next-pop {
+  from { transform: scale(0.92); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
 /* ---- Trace ---- */
 .trace-wrap {
   background: white;
