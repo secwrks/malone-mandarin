@@ -268,6 +268,9 @@ main {
   font-family: "PingFang TC", "Heiti TC", "STKaiti", serif;
 }
 .q-hanzi.small { font-size: 56px; }
+/* Read mode: the character is the whole question, so show it bigger. */
+.q-hanzi.read { font-size: 128px; }
+.q-hanzi.read.small { font-size: 88px; }
 .q-meaning { font-size: 22px; margin-top: 8px; font-weight: 600; }
 .q-pinyin { font-size: 18px; color: var(--ink-soft); margin-top: 6px; }
 

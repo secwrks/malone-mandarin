@@ -443,7 +443,7 @@ function renderRead(q) {
   area.innerHTML = `
     <div class="q-prompt">
       <div class="q-instruction">${instruction}</div>
-      <div class="q-hanzi ${isLong ? "small" : ""}" id="read-hanzi">${q.word.hanzi}</div>
+      <div class="q-hanzi read ${isLong ? "small" : ""}" id="read-hanzi">${q.word.hanzi}</div>
       ${pinyinHint}
     </div>
     <div class="choices" id="choices"></div>
